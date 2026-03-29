@@ -1,3 +1,49 @@
+## 2026-03-29
+
+### Additions and New Features
+
+- Added `tmux_bridge.py`: Python interface for tmux sessions (list, capture, send keys, send named keys, get cwd/size).
+- Added `server.py`: FastAPI web server with token-gated auth, multi-session API, WebSocket streaming, plan file serving, and skills discovery.
+- Added `launch_session.sh`: bash launcher script that creates fresh `{tool}-{reponame}-{timestamp}` tmux sessions for Claude Code or Codex.
+- Added `static/index.html`: single-file mobile-first web UI with token entry, session picker, ANSI-colored output, navigation pad, session controls, and plans viewer.
+- Added `tests/test_tmux_bridge.py`: 17 tests for the tmux bridge module.
+- Added `tests/test_server.py`: 14 tests for auth, session API, and plan path traversal hardening.
+- Added `docs/USAGE.md`: detailed usage documentation for server, launcher, and web UI.
+- Updated `pip_requirements.txt` with fastapi, uvicorn.
+- Updated `README.md` with project description, quick start, and architecture overview.
+- Added `kill_sessions.sh`: kills all claude/codex tmux sessions and the web server.
+
+### Behavior or Interface Changes
+
+- Changed token format from random base64 to human-typable 4-word format (e.g., `globe-vivid-quartz-storm`).
+- Changed cookie auth from in-memory set to HMAC-derived from token, so cookies survive server restarts.
+- Changed server default bind from `127.0.0.1` to `0.0.0.0` for LAN access by default.
+- Changed output rendering from append-event chunks to full-replace model using complete scrollback capture, fixing repeated output display.
+- Launcher script now auto-starts the web server in a tmux session (`cwac-server`) if not already running.
+- Launcher script prints browsable LAN URL (e.g., `http://192.168.2.75:8741`).
+
+### Fixes and Maintenance
+
+- Added return type hints to all async endpoints and `main()` in `server.py`.
+- Removed unused `fastapi.staticfiles` import from `server.py`.
+- Reordered imports by length then alphabetical in `server.py`.
+- Removed dead `userScrolledUp` variable from `static/index.html`.
+- Added 10-second timeout to `subprocess.run()` in `tmux_bridge._run_tmux()`.
+- Added custom session name validation in `launch_session.sh` (must start with `claude-` or `codex-`).
+- Fixed token comparison to use constant-time `hmac.compare_digest`.
+- Added 4096-character length cap on text input forwarded to tmux.
+- Removed unused `pyyaml` from `pip_requirements.txt`.
+- Fixed `docs/USAGE.md` default host to match `server.py` (`0.0.0.0`).
+
+### Decisions and Failures
+
+- Chose to discover sessions by tmux naming convention (claude-*/codex-*) instead of config file, reducing maintenance overhead.
+- Chose to always create fresh tmux sessions instead of reusing existing ones, avoiding stale session ambiguity.
+- Plans are read from `~/.claude/plans/` (global) not per-repo, matching how Claude Code stores plans.
+- No audit log in MVP: single-user setup behind private network makes it unnecessary complexity.
+- No git status display: the app is for planning and editing, not git control.
+- All user input routed through tmux only: server never executes shell commands.
+
 ## 2026-03-13
 
 ### Additions and New Features

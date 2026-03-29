@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Claude Web Control</title>
+<style>
+/* --- reset and base --- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #1a1a2e;
+  --bg2: #16213e;
+  --bg3: #0f3460;
+  --fg: #e0e0e0;
+  --fg2: #a0a0b0;
+  --accent: #7c83ff;
+  --accent2: #5c63df;
+  --green: #4ec9b0;
+  --red: #f44747;
+  --yellow: #dcdcaa;
+  --pad-btn: #2a2a4e;
+  --pad-btn-active: #3a3a6e;
+  --radius: 8px;
+}
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  -webkit-text-size-adjust: 100%;
+  overflow: hidden;
+}
+
+/* --- views: only one visible at a time --- */
+.view { display: none; flex-direction: column; height: 100%; }
+.view.active { display: flex; }
+
+/* --- token entry --- */
+#token-view {
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  padding-top: env(safe-area-inset-top);
+}
+#token-view h1 { font-size: 22px; margin-bottom: 20px; color: var(--accent); }
+#token-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 14px;
+  font-size: 16px;
+  background: var(--bg2);
+  color: var(--fg);
+  border: 1px solid var(--bg3);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+}
+#token-submit {
+  min-height: 48px;
+  min-width: 120px;
+  padding: 12px 24px;
+  font-size: 16px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+#token-error { color: var(--red); margin-top: 10px; font-size: 14px; }
+
+/* --- session picker --- */
+#sessions-view { padding-top: env(safe-area-inset-top); }
+#sessions-header {
+  padding: 16px;
+  font-size: 18px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--bg3);
+}
+#sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.session-card {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--bg2);
+  cursor: pointer;
+  min-height: 60px;
+}
+.session-card:active { background: var(--bg2); }
+.session-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.session-name { font-weight: 600; font-size: 15px; }
+.session-tool {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--bg3);
+  color: var(--accent);
+}
+.session-status { font-size: 13px; color: var(--fg2); }
+.session-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+.dot-alive { background: var(--green); }
+.dot-dead { background: var(--red); }
+#sessions-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--bg3);
+  display: flex;
+  gap: 8px;
+}
+.footer-btn {
+  flex: 1;
+  min-height: 44px;
+  padding: 10px;
+  font-size: 14px;
+  background: var(--bg2);
+  color: var(--fg);
+  border: 1px solid var(--bg3);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: center;
+}
+.footer-btn:active { background: var(--bg3); }
+
+/* --- chat view --- */
+#chat-view { padding-top: env(safe-area-inset-top); }
+#chat-topbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bg3);
+  gap: 8px;
+  flex-shrink: 0;
+}
+#back-btn {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#chat-session-info { flex: 1; font-size: 14px; }
+#chat-session-name { font-weight: 600; }
+#chat-session-meta { font-size: 12px; color: var(--fg2); }
+#connection-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--red);
+}
+.connected { background: var(--green) !important; }
+
+/* --- session controls strip --- */
+#controls-strip {
+  display: flex;
+  padding: 6px 8px;
+  gap: 6px;
+  border-bottom: 1px solid var(--bg2);
+  flex-shrink: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.control-chip {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--bg2);
+  color: var(--fg2);
+  border: 1px solid var(--bg3);
+  border-radius: 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.control-chip:active { background: var(--bg3); }
+
+/* --- output area --- */
+#output-area {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 10px;
+  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- navigation pad --- */
+#nav-pad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--bg2);
+  flex-shrink: 0;
+}
+.nav-btn {
+  min-height: 44px;
+  background: var(--pad-btn);
+  color: var(--fg);
+  border: 1px solid var(--bg3);
+  border-radius: var(--radius);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-btn:active { background: var(--pad-btn-active); }
+.nav-btn.wide { grid-column: span 2; }
+
+/* --- text input area --- */
+#input-bar {
+  display: flex;
+  padding: 6px 8px;
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  gap: 6px;
+  border-top: 1px solid var(--bg3);
+  flex-shrink: 0;
+}
+#text-input {
+  flex: 1;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 16px;
+  background: var(--bg2);
+  color: var(--fg);
+  border: 1px solid var(--bg3);
+  border-radius: var(--radius);
+}
+#send-btn {
+  min-width: 60px;
+  min-height: 44px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 15px;
+  cursor: pointer;
+}
+#send-btn:active { background: var(--accent2); }
+
+/* --- plans viewer overlay --- */
+#plans-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  z-index: 100;
+  flex-direction: column;
+}
+#plans-overlay.active { display: flex; }
+#plans-header {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--bg3);
+}
+#plans-back {
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 20px;
+  cursor: pointer;
+}
+#plans-title { flex: 1; font-size: 16px; font-weight: 600; }
+#plans-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px;
+  font-family: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- dropdown menus --- */
+.dropdown-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 50;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+.dropdown-overlay.active { display: flex; }
+.dropdown-menu {
+  background: var(--bg2);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 360px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.dropdown-item {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--bg3);
+  cursor: pointer;
+  font-size: 15px;
+}
+.dropdown-item:active { background: var(--bg3); }
+.dropdown-item:last-child { border-bottom: none; }
+.dropdown-title {
+  padding: 12px 16px;
+  font-size: 14px;
+  color: var(--fg2);
+  border-bottom: 1px solid var(--bg3);
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+
+<!-- TOKEN ENTRY VIEW -->
+<div id="token-view" class="view active">
+  <h1>Claude Web Control</h1>
+  <input id="token-input" type="password" placeholder="Enter access token" autocomplete="off">
+  <button id="token-submit" onclick="submitToken()">Unlock</button>
+  <div id="token-error"></div>
+</div>
+
+<!-- SESSIONS VIEW -->
+<div id="sessions-view" class="view">
+  <div id="sessions-header">Sessions</div>
+  <div id="sessions-list"></div>
+  <div id="sessions-footer">
+    <button class="footer-btn" onclick="refreshSessions()">Refresh</button>
+    <button class="footer-btn" onclick="openPlans()">Plans</button>
+  </div>
+</div>
+
+<!-- CHAT VIEW -->
+<div id="chat-view" class="view">
+  <div id="chat-topbar">
+    <button id="back-btn" onclick="showSessions()">&larr;</button>
+    <div id="chat-session-info">
+      <div id="chat-session-name"></div>
+      <div id="chat-session-meta"></div>
+    </div>
+    <div id="connection-dot"></div>
+  </div>
+  <div id="controls-strip">
+    <button class="control-chip" onclick="openDropdown('model')">Model</button>
+    <button class="control-chip" onclick="openDropdown('effort')">Effort</button>
+    <button class="control-chip" id="mode-chip" onclick="openDropdown('mode')">Mode</button>
+    <button class="control-chip" onclick="openDropdown('skills')">Skills</button>
+    <button class="control-chip" onclick="openDropdown('more')">...</button>
+  </div>
+  <div id="output-area"></div>
+  <div id="nav-pad">
+    <button class="nav-btn" onclick="sendKey('Left')">&larr;</button>
+    <button class="nav-btn" onclick="sendKey('Up')">&uarr;</button>
+    <button class="nav-btn" onclick="sendKey('Down')">&darr;</button>
+    <button class="nav-btn" onclick="sendKey('Right')">&rarr;</button>
+    <button class="nav-btn" onclick="sendKey('Tab')">Tab</button>
+    <button class="nav-btn" onclick="sendKey('BTab')">S-Tab</button>
+    <button class="nav-btn wide" onclick="sendKey('Enter')">Enter</button>
+    <button class="nav-btn" onclick="sendKey('Escape')">Esc</button>
+    <button class="nav-btn" onclick="sendKey('BSpace')">Bksp</button>
+    <button class="nav-btn" onclick="sendKey('Space')">Space</button>
+    <button class="nav-btn" onclick="sendKey('C-c')">Ctrl-C</button>
+  </div>
+  <div id="input-bar">
+    <input id="text-input" type="text" placeholder="Type a reply..." autocomplete="off" enterkeyhint="send">
+    <button id="send-btn" onclick="sendText()">Send</button>
+  </div>
+</div>
+
+<!-- PLANS OVERLAY -->
+<div id="plans-overlay">
+  <div id="plans-header">
+    <button id="plans-back" onclick="closePlans()">&larr;</button>
+    <div id="plans-title">Plans</div>
+  </div>
+  <div id="plans-content"></div>
+</div>
+
+<!-- DROPDOWN OVERLAYS -->
+<div id="dropdown-overlay" class="dropdown-overlay" onclick="closeDropdown()">
+  <div class="dropdown-menu" id="dropdown-menu" onclick="event.stopPropagation()">
+    <div class="dropdown-title" id="dropdown-title"></div>
+    <div id="dropdown-items"></div>
+  </div>
+</div>
+
+<script>
+// --- state ---
+let currentSession = null;
+let ws = null;
+let reconnectTimeout = null;
+let reconnectDelay = 1000;
+let scrollbackStore = {}; // session_name -> html content
+let skillsCache = {};
+
+// --- view switching ---
+function showView(id) {
+  document.querySelectorAll(".view").forEach(function(v) { v.classList.remove("active"); });
+  document.getElementById(id).classList.add("active");
+}
+
+// --- token entry ---
+async function submitToken() {
+  var tokenInput = document.getElementById("token-input");
+  var errorEl = document.getElementById("token-error");
+  errorEl.textContent = "";
+  var token = tokenInput.value.trim();
+  if (!token) { errorEl.textContent = "Please enter a token"; return; }
+  var resp = await fetch("/auth", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({token: token}),
+  });
+  if (resp.ok) {
+    tokenInput.value = "";
+    showView("sessions-view");
+    refreshSessions();
+  } else {
+    errorEl.textContent = "Invalid token";
+  }
+}
+
+// handle enter key on token input
+document.getElementById("token-input").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") submitToken();
+});
+
+// --- sessions ---
+async function refreshSessions() {
+  var resp = await fetch("/api/sessions");
+  if (resp.status === 401) { showView("token-view"); return; }
+  var sessions = await resp.json();
+  var listEl = document.getElementById("sessions-list");
+  listEl.innerHTML = "";
+  if (sessions.length === 0) {
+    listEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--fg2);">No sessions found.<br>Use launch_session.sh to start one.</div>';
+    return;
+  }
+  sessions.forEach(function(s) {
+    var card = document.createElement("div");
+    card.className = "session-card";
+    card.onclick = function() { openSession(s); };
+    var alive = s.alive;
+    var dotClass = alive ? "dot-alive" : "dot-dead";
+    var statusText = alive ? "alive" : "dead";
+    var activity = "";
+    if (s.last_activity > 0) {
+      var ago = Math.round((Date.now() / 1000 - s.last_activity));
+      if (ago < 60) activity = ago + "s ago";
+      else if (ago < 3600) activity = Math.round(ago / 60) + "m ago";
+      else activity = Math.round(ago / 3600) + "h ago";
+    }
+    card.innerHTML = '<div class="session-top">' +
+      '<span class="session-name">' + escapeHtml(s.repo_name) + '</span>' +
+      '<span class="session-tool">' + escapeHtml(s.tool) + '</span>' +
+      '</div>' +
+      '<div class="session-status">' +
+      '<span class="session-dot ' + dotClass + '"></span>' +
+      statusText +
+      (activity ? ' &middot; ' + activity : '') +
+      '</div>';
+    listEl.appendChild(card);
+  });
+}
+
+function showSessions() {
+  // save current scrollback before leaving chat
+  if (currentSession) {
+    scrollbackStore[currentSession] = document.getElementById("output-area").innerHTML;
+  }
+  disconnectWs();
+  currentSession = null;
+  showView("sessions-view");
+  refreshSessions();
+}
+
+// --- chat ---
+function openSession(session) {
+  currentSession = session.name;
+  document.getElementById("chat-session-name").textContent = session.repo_name;
+  document.getElementById("chat-session-meta").textContent = session.tool + " - " + session.name;
+  // restore scrollback if any
+  var outputArea = document.getElementById("output-area");
+  if (scrollbackStore[session.name]) {
+    outputArea.innerHTML = scrollbackStore[session.name];
+  } else {
+    outputArea.innerHTML = "";
+  }
+  showView("chat-view");
+  connectWs(session.name);
+}
+
+function connectWs(sessionName) {
+  disconnectWs();
+  var protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  var url = protocol + "//" + location.host + "/ws/" + encodeURIComponent(sessionName);
+  ws = new WebSocket(url);
+  ws.onopen = function() {
+    document.getElementById("connection-dot").classList.add("connected");
+    reconnectDelay = 1000;
+  };
+  ws.onclose = function() {
+    document.getElementById("connection-dot").classList.remove("connected");
+    scheduleReconnect(sessionName);
+  };
+  ws.onerror = function() {
+    document.getElementById("connection-dot").classList.remove("connected");
+  };
+  ws.onmessage = function(event) {
+    var msg = JSON.parse(event.data);
+    if (msg.type === "pane_update") {
+      handlePaneUpdate(msg.content);
+    }
+  };
+}
+
+function disconnectWs() {
+  if (reconnectTimeout) { clearTimeout(reconnectTimeout); reconnectTimeout = null; }
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+  document.getElementById("connection-dot").classList.remove("connected");
+}
+
+function scheduleReconnect(sessionName) {
+  if (reconnectTimeout) clearTimeout(reconnectTimeout);
+  reconnectTimeout = setTimeout(function() {
+    if (currentSession === sessionName) {
+      connectWs(sessionName);
+    }
+  }, reconnectDelay);
+  // exponential backoff, max 30s
+  reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+}
+
+// --- output rendering ---
+var lastPaneContent = "";
+
+function handlePaneUpdate(content) {
+  // strip trailing blank lines for comparison
+  var trimmed = content.replace(/\s+$/, "");
+  if (trimmed === lastPaneContent) return;
+  lastPaneContent = trimmed;
+  var outputArea = document.getElementById("output-area");
+  // check if user has scrolled up (not at bottom)
+  var atBottom = (outputArea.scrollHeight - outputArea.scrollTop - outputArea.clientHeight) < 50;
+  // replace entire content with full scrollback
+  outputArea.innerHTML = ansiToHtml(trimmed);
+  // only auto-scroll if user was already at the bottom
+  if (atBottom) {
+    outputArea.scrollTop = outputArea.scrollHeight;
+  }
+}
+
+
+// --- ANSI to HTML converter (basic colors) ---
+function ansiToHtml(text) {
+  // escape HTML first
+  var escaped = escapeHtml(text);
+  // replace ANSI color codes with spans
+  var result = escaped.replace(/\x1b\[([0-9;]*)m/g, function(match, codes) {
+    if (!codes || codes === "0") return '</span>';
+    var parts = codes.split(";");
+    var styles = [];
+    for (var i = 0; i < parts.length; i++) {
+      var code = parseInt(parts[i]);
+      var color = ansiColorMap[code];
+      if (color) {
+        if (code >= 30 && code <= 37 || code >= 90 && code <= 97) {
+          styles.push("color:" + color);
+        } else if (code >= 40 && code <= 47 || code >= 100 && code <= 107) {
+          styles.push("background-color:" + color);
+        }
+      }
+      if (code === 1) styles.push("font-weight:bold");
+      if (code === 3) styles.push("font-style:italic");
+      if (code === 4) styles.push("text-decoration:underline");
+      if (code === 2) styles.push("opacity:0.7");
+    }
+    if (styles.length > 0) {
+      return '<span style="' + styles.join(";") + '">';
+    }
+    return '';
+  });
+  // strip any remaining escape sequences we do not handle
+  result = result.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
+  result = result.replace(/\x1b\][^\x07]*\x07/g, ""); // OSC sequences
+  return result;
+}
+
+var ansiColorMap = {
+  30: "#1a1a1a", 31: "#f44747", 32: "#4ec9b0", 33: "#dcdcaa",
+  34: "#569cd6", 35: "#c586c0", 36: "#4ec9b0", 37: "#d4d4d4",
+  90: "#808080", 91: "#f44747", 92: "#4ec9b0", 93: "#dcdcaa",
+  94: "#569cd6", 95: "#c586c0", 96: "#4ec9b0", 97: "#ffffff",
+  40: "#1a1a1a", 41: "#f44747", 42: "#4ec9b0", 43: "#dcdcaa",
+  44: "#569cd6", 45: "#c586c0", 46: "#4ec9b0", 47: "#d4d4d4",
+};
+
+function escapeHtml(text) {
+  var div = document.createElement("div");
+  div.appendChild(document.createTextNode(text));
+  return div.innerHTML;
+}
+
+// --- input ---
+function sendText() {
+  var input = document.getElementById("text-input");
+  var text = input.value;
+  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({type: "text", data: text}));
+  input.value = "";
+  input.focus();
+}
+
+function sendKey(keyName) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({type: "key", data: keyName}));
+}
+
+// handle enter key on text input
+document.getElementById("text-input").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendText();
+  }
+});
+
+// --- mode picker ---
+// mode order matches Claude's Shift+Tab cycling order
+var MODE_ORDER = ["default", "acceptEdits", "plan", "auto"];
+var currentMode = "default"; // best-effort, not authoritative
+
+function openModeDropdown() {
+  var items = MODE_ORDER.map(function(mode) {
+    var label = mode;
+    if (mode === currentMode) label = mode + " (current)";
+    return {label: label, mode: mode};
+  });
+  // build custom dropdown with mode-specific behavior
+  document.getElementById("dropdown-title").textContent = "Mode (current: " + currentMode + ")";
+  var container = document.getElementById("dropdown-items");
+  container.innerHTML = "";
+  items.forEach(function(item) {
+    var el = document.createElement("div");
+    el.className = "dropdown-item";
+    el.textContent = item.label;
+    el.onclick = function() {
+      closeDropdown();
+      switchToMode(item.mode);
+    };
+    container.appendChild(el);
+  });
+  document.getElementById("dropdown-overlay").classList.add("active");
+}
+
+function switchToMode(targetMode) {
+  // calculate how many Shift+Tab presses to reach target from current
+  var currentIdx = MODE_ORDER.indexOf(currentMode);
+  var targetIdx = MODE_ORDER.indexOf(targetMode);
+  if (currentIdx === -1) currentIdx = 0;
+  if (targetIdx === -1) return;
+  // cycle forward (Shift+Tab goes forward through the list)
+  var steps = (targetIdx - currentIdx + MODE_ORDER.length) % MODE_ORDER.length;
+  if (steps === 0) return; // already there
+  // send the needed number of BTab presses
+  for (var i = 0; i < steps; i++) {
+    sendKey("BTab");
+  }
+  // optimistically update displayed mode
+  currentMode = targetMode;
+  document.getElementById("mode-chip").textContent = "Mode: " + targetMode;
+}
+
+// --- dropdowns ---
+function openDropdown(type) {
+  var title = "";
+  var items = [];
+  if (type === "model") {
+    title = "Model";
+    items = [
+      {label: "Opus", cmd: "/model opus"},
+      {label: "Sonnet", cmd: "/model sonnet"},
+      {label: "Haiku", cmd: "/model haiku"},
+    ];
+  } else if (type === "effort") {
+    title = "Effort";
+    items = [
+      {label: "Low", cmd: "/effort low"},
+      {label: "Medium", cmd: "/effort medium"},
+      {label: "High", cmd: "/effort high"},
+      {label: "Max", cmd: "/effort max"},
+      {label: "Auto", cmd: "/effort auto"},
+    ];
+  } else if (type === "mode") {
+    title = "Mode (current: " + currentMode + ")";
+    openModeDropdown();
+    return;
+  } else if (type === "skills") {
+    title = "Skills";
+    loadSkillsDropdown();
+    return;
+  } else if (type === "more") {
+    title = "More";
+    items = [
+      {label: "/clear", cmd: "/clear"},
+      {label: "/context", cmd: "/context"},
+      {label: "/usage", cmd: "/usage"},
+      {label: "/plan", cmd: "/plan"},
+    ];
+  }
+  showDropdownItems(title, items);
+}
+
+function showDropdownItems(title, items) {
+  document.getElementById("dropdown-title").textContent = title;
+  var container = document.getElementById("dropdown-items");
+  container.innerHTML = "";
+  items.forEach(function(item) {
+    var el = document.createElement("div");
+    el.className = "dropdown-item";
+    el.textContent = item.label;
+    if (item.prefill) {
+      // prefill text box instead of sending
+      el.onclick = function() {
+        closeDropdown();
+        var input = document.getElementById("text-input");
+        input.value = item.cmd + " ";
+        input.focus();
+      };
+    } else {
+      el.onclick = function() {
+        closeDropdown();
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({type: "text", data: item.cmd}));
+        }
+      };
+    }
+    container.appendChild(el);
+  });
+  document.getElementById("dropdown-overlay").classList.add("active");
+}
+
+async function loadSkillsDropdown() {
+  // determine tool type from session name
+  var tool = "claude";
+  if (currentSession && currentSession.startsWith("codex-")) tool = "codex";
+  // use cache if available
+  if (!skillsCache[tool]) {
+    var resp = await fetch("/api/skills/" + tool);
+    if (resp.ok) {
+      skillsCache[tool] = await resp.json();
+    } else {
+      skillsCache[tool] = [];
+    }
+  }
+  var skills = skillsCache[tool];
+  var items = skills.map(function(s) {
+    return {label: s.name + (s.description ? " - " + s.description.substring(0, 40) : ""), cmd: "/" + s.name, prefill: true};
+  });
+  if (items.length === 0) {
+    items = [{label: "No skills found", cmd: ""}];
+  }
+  showDropdownItems("Skills (" + tool + ")", items);
+}
+
+function closeDropdown() {
+  document.getElementById("dropdown-overlay").classList.remove("active");
+}
+
+// --- plans ---
+async function openPlans() {
+  var resp = await fetch("/api/plans");
+  if (resp.status === 401) { showView("token-view"); return; }
+  var plans = await resp.json();
+  var content = document.getElementById("plans-content");
+  if (plans.length === 0) {
+    content.innerHTML = '<div style="padding:20px; text-align:center; color:var(--fg2);">No plans found in ~/.claude/plans/</div>';
+  } else {
+    content.innerHTML = "";
+    plans.forEach(function(p) {
+      var item = document.createElement("div");
+      item.style.cssText = "padding:12px; border-bottom:1px solid var(--bg3); cursor:pointer;";
+      item.textContent = p.filename;
+      item.onclick = function() { viewPlan(p.filename); };
+      content.appendChild(item);
+    });
+  }
+  document.getElementById("plans-title").textContent = "Plans";
+  document.getElementById("plans-overlay").classList.add("active");
+}
+
+async function viewPlan(filename) {
+  var resp = await fetch("/api/plans/" + encodeURIComponent(filename));
+  if (!resp.ok) return;
+  var data = await resp.json();
+  document.getElementById("plans-title").textContent = filename;
+  document.getElementById("plans-content").textContent = data.content;
+}
+
+function closePlans() {
+  document.getElementById("plans-overlay").classList.remove("active");
+}
+
+// --- init: check if already authenticated ---
+async function init() {
+  var resp = await fetch("/api/sessions");
+  if (resp.ok) {
+    showView("sessions-view");
+    refreshSessions();
+  }
+  // else stay on token entry view
+}
+init();
+</script>
+</body>
+</html>

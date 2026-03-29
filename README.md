@@ -1,20 +1,29 @@
-# starter_repo_template
-`starter_repo_template` is canonical bootstrap infrastructure for Python repositories that need consistent repository policy, Python style conventions, licensing boundaries, and test/lint scaffolding before project-specific code is added.
+# claude-web-app-control
 
-Only `README.md` and `docs/CHANGELOG.md` are intentionally repository-specific; every other file is designed to remain generic for downstream template users.
-
-## Documentation
-
-- [docs/REPO_STYLE.md](docs/REPO_STYLE.md): Repository structure, naming, versioning, dependency manifest, and licensing conventions.
-- [docs/PYTHON_STYLE.md](docs/PYTHON_STYLE.md): Python implementation rules for formatting, structure, imports, argparse, and testing.
-- [docs/MARKDOWN_STYLE.md](docs/MARKDOWN_STYLE.md): Markdown writing and formatting conventions for repository documentation.
-- [docs/AUTHORS.md](docs/AUTHORS.md): Canonical authorship and attribution metadata for template maintenance.
-- [docs/CHANGELOG.md](docs/CHANGELOG.md): Repository-specific history of updates to this template.
+Phone-friendly web UI for interacting with Claude Code and Codex sessions running in tmux on a Mac Studio. The app is a remote view and input surface that sends keystrokes to tmux and displays output. It never executes shell commands itself; tool-use policy is enforced by Claude Code's `PreToolUse` permission hook.
 
 ## Quick start
 
-Run one focused repo check:
+From inside any git repository on the Mac Studio:
 
 ```bash
-/opt/homebrew/opt/python@3.12/bin/python3.12 -m pytest tests/test_shebangs.py -q
+./launch_session.sh claude
+```
+
+This creates a tmux session, starts the web server if needed, and prints the URL and token. Open the URL on your phone and enter the token.
+
+## Documentation
+
+- [docs/USAGE.md](docs/USAGE.md): CLI flags, session management, and web UI controls
+- [docs/CHANGELOG.md](docs/CHANGELOG.md): chronological record of changes
+- [docs/AUTHORS.md](docs/AUTHORS.md): maintainer and attribution
+- [docs/REPO_STYLE.md](docs/REPO_STYLE.md): repository conventions
+- [docs/PYTHON_STYLE.md](docs/PYTHON_STYLE.md): Python coding standards
+- [docs/MARKDOWN_STYLE.md](docs/MARKDOWN_STYLE.md): Markdown formatting rules
+- [docs/CLAUDE_HOOK_USAGE_GUIDE.md](docs/CLAUDE_HOOK_USAGE_GUIDE.md): permission hook reference
+
+## Testing
+
+```bash
+source source_me.sh && python3 -m pytest tests/ -q
 ```
